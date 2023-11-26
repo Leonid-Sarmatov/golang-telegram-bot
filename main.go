@@ -6,6 +6,10 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+type rootMenu struct {
+	
+}
+
 func main() {
 	//token := os.Getenv("6058196438:AAH2svI0pJAcJ592nIojO1yuv43JwFwRlu4")
 	token := "6058196438:AAH2svI0pJAcJ592nIojO1yuv43JwFwRlu4"
