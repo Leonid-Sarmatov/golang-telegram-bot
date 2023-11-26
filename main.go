@@ -6,8 +6,57 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type rootMenu struct {
-	
+type Node interface {
+	isEnding() bool
+	getName() string
+	getCallback() string
+	getSubmenus() []Node
+}
+
+type NodeMenu struct {
+	Name string
+	SubMenu []Node
+}
+
+type EndingMenu struct {
+	Name string
+	Callback string
+}
+
+
+
+func (m *NodeMenu) isEnding() bool {
+	return false
+}
+
+func (m *NodeMenu) getName() string {
+	return m.Name
+}
+
+func (m *NodeMenu) getCallback() string {
+	return "None"
+}
+
+func (m *NodeMenu) getSubmenus() []Node {
+	return m.SubMenu
+}
+
+
+
+func (e *EndingMenu) isEnding() bool {
+	return true
+}
+
+func (e *EndingMenu) getName() string {
+	return e.Name
+}
+
+func (e *EndingMenu) getCallback() string {
+	return e.Callback
+}
+
+func (e *EndingMenu) getSubmenus() []Node {
+	return nil
 }
 
 func main() {
@@ -70,15 +119,31 @@ func main() {
 
 		if update.Message.Text == "See menu" {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "This is my menu.")
-			msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("Pizza 1", "1"),
-					tgbotapi.NewInlineKeyboardButtonData("Pizza 2", "2"),
-					tgbotapi.NewInlineKeyboardButtonData("Pizza 3", "3"),
-					tgbotapi.NewInlineKeyboardButtonURL("More pizzes:", "https://example.com"),
-				),
+			msg.ReplyMarkup = VerticalDataInlineKeyboardMaker(
+				[]string{"Pizza 1", "Pizza 2", "Pizza 3"},
+				[]string{"1", "2", "3"},
 			)
 			bot.Send(msg)
 		}
 	}
+}
+
+func VerticalDataInlineKeyboardMaker(names, callbacks []string) tgbotapi.InlineKeyboardMarkup {
+	/*
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Pizza 1", "1"),
+			tgbotapi.NewInlineKeyboardButtonData("Pizza 2", "2"),
+			tgbotapi.NewInlineKeyboardButtonData("Pizza 3", "3"),
+			tgbotapi.NewInlineKeyboardButtonURL("More pizzes:", "https://example.com"),
+		),
+	)*/
+	
+	var buttons []tgbotapi.InlineKeyboardButton
+
+	for i := 0; i < len(names); i+=1 {
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(names[i], callbacks[i]))
+	}
+
+	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(buttons...))
 }
