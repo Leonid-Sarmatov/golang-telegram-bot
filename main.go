@@ -2,10 +2,45 @@ package main
 
 import (
 	"log"
+	"strconv"
+	"fmt"
 	//"os"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+
+// Структура описывающая корзину заказа
+type Cart struct {
+	SumPrice int
+	OrderItems []EndingMenu
+}
+
+// Добавления в заказ позиции 
+func (c *Cart) AddOrderItems(e EndingMenu) error {
+	n, err := strconv.Atoi(e.Price)
+	if err != nil {
+		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", e.Name)
+	}
+
+	c.SumPrice += n
+	c.OrderItems = append(c.OrderItems, e)
+	return nil
+}
+
+// Добавления в заказ позиции 
+func (c *Cart) RemoveOrderItems(e EndingMenu) error {
+	n, err := strconv.Atoi(e.Price)
+	if err != nil {
+		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", e.Name)
+	}
+
+	c.SumPrice -= n
+	
+	c.OrderItems = append(c.OrderItems, e)
+	return nil
+}
+
+// Интерфейс, описывающий обстрактный узел дерева меню
 type Node interface {
 	isEnding() bool
 	getName() string
@@ -13,12 +48,14 @@ type Node interface {
 	getSubmenus() []Node
 }
 
+// Структура, описывающая узел дерева меню, не являющийся конечным
 type NodeMenu struct {
 	Name string
 	Callback string
 	SubMenu []Node
 }
 
+// Структура, описывающая конечные узлы дерева, то есть позиции для заказа
 type EndingMenu struct {
 	Name string
 	Price string
@@ -101,17 +138,7 @@ func main() {
 				msg.ReplyMarkup = kb
 				bot.Send(msg)
 			}
-			/*switch update.CallbackQuery.Data {
-			case "1":
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Pizza 1")
-				bot.Send(msg)
-			case "2":
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Pizza 2")
-				bot.Send(msg)
-			case "3":
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Pizza 3")
-				bot.Send(msg)
-			}*/
+			
 		}
 
 		if update.Message == nil {
