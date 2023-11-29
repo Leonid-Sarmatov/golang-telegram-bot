@@ -21,7 +21,7 @@ type Cart struct {
 }
 
 // Добавления позиции в корзину
-func (c *Cart) AddOrderItems(p Position) error {
+func (c *Cart) AddPositionItem(p Position) error {
 	d, err := strconv.Atoi(p.Price)
 	if err != nil {
 		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", p.Name)
@@ -36,7 +36,7 @@ func (c *Cart) AddOrderItems(p Position) error {
 }
 
 // Удаление позиции из корзины
-func (c *Cart) RemoveOrderItems(p Position) error {
+func (c *Cart) RemovePositionItem(p Position) error {
 	d, err := strconv.Atoi(p.Price)
 	if err != nil {
 		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", p.Name)
@@ -305,7 +305,7 @@ func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbo
 		// Если корзина для пользователя уже создана, то обновляем ее   userId, callback string
 		cart, ok := (*cartMap)[id];
 		if ok {
-			cart.AddOrderItems(pos)
+			cart.AddPositionItem(pos)
 			(*cartMap)[id] = cart
 		// Иначе создаем новую корзину и добавляем в нее позицию 
 		} else {
@@ -313,7 +313,7 @@ func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbo
 				SumPrice: "0",
 				PositionItems: make(map[string]Position),
 			}
-			newCart.AddOrderItems(pos)
+			newCart.AddPositionItem(pos)
 			(*cartMap)[id] = newCart
 		}
 		return nil
