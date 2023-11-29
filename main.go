@@ -12,7 +12,7 @@ import (
 // Структура описывающая корзину заказа
 type Cart struct {
 	SumPrice int
-	OrderItems []EndingMenu
+	OrderItems map[string]EndingMenu
 }
 
 // Добавления в заказ позиции 
@@ -23,11 +23,11 @@ func (c *Cart) AddOrderItems(e EndingMenu) error {
 	}
 
 	c.SumPrice += n
-	c.OrderItems = append(c.OrderItems, e)
+	c.OrderItems[e.Name] = e
 	return nil
 }
 
-// Добавления в заказ позиции 
+// Удаление позиции из заказа
 func (c *Cart) RemoveOrderItems(e EndingMenu) error {
 	n, err := strconv.Atoi(e.Price)
 	if err != nil {
@@ -35,8 +35,7 @@ func (c *Cart) RemoveOrderItems(e EndingMenu) error {
 	}
 
 	c.SumPrice -= n
-	
-	c.OrderItems = append(c.OrderItems, e)
+	delete(c.OrderItems, e.Name)
 	return nil
 }
 
@@ -46,6 +45,7 @@ type Node interface {
 	getName() string
 	getCallback() string
 	getSubmenus() []Node
+	getPrice() string
 }
 
 // Структура, описывающая узел дерева меню, не являющийся конечным
@@ -80,6 +80,10 @@ func (m NodeMenu) getSubmenus() []Node {
 	return m.SubMenu
 }
 
+func (m NodeMenu) getPrice() string {
+	return "None"
+}
+
 
 
 func (e EndingMenu) isEnding() bool {
@@ -98,13 +102,17 @@ func (e EndingMenu) getSubmenus() []Node {
 	return nil
 }
 
+func (e EndingMenu) getPrice() string {
+	return e.Price
+}
+
 func main() {
     e1 := EndingMenu { Name: "Пеперони", Price: "100p", Callback: "peperoni" }
-	e2 := EndingMenu { Name: "Четыре сыра", Price: "100p", Callback: "4_chees" }
-	e3 := EndingMenu { Name: "Маргарита", Price: "100p", Callback: "margarita" }
+	e2 := EndingMenu { Name: "Четыре сыра", Price: "120p", Callback: "4_chees" }
+	e3 := EndingMenu { Name: "Маргарита", Price: "90p", Callback: "margarita" }
 
-	e4 := EndingMenu { Name: "Капучино", Callback: "capuchino" }
-	e5 := EndingMenu { Name: "Латте", Callback: "latte" }
+	e4 := EndingMenu { Name: "Капучино", Price: "150p", Callback: "capuchino" }
+	e5 := EndingMenu { Name: "Латте", Price: "150p", Callback: "latte" }
 
 	n1 := NodeMenu { Name: "Пицца", Callback: "pizza", SubMenu: []Node{ e1, e2, e3 }}
 	n2 := NodeMenu { Name: "Напитки", Callback: "drink", SubMenu: []Node{ e4, e5 }}
@@ -131,12 +139,19 @@ func main() {
 	for update := range updates {
 
 		if update.CallbackQuery != nil {
-			nameArr, callbackArr := Navigation(update.CallbackQuery.Data, n0)
-			if len(nameArr) != 0 {
-				kb := VerticalDataInlineKeyboardMaker(nameArr, callbackArr)
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Выберите пункт меню")
-				msg.ReplyMarkup = kb
-				bot.Send(msg)
+			nameArr, callbackArr, priceArr := Navigation(update.CallbackQuery.Data, n0)
+			if len(nameArr) != 0 { // PriceListInlineKeyboardMarkup
+				if len(priceArr) != 0 {
+					kb := PriceListInlineKeyboardMarkup(nameArr, priceArr, callbackArr)
+					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Выберите товар")
+					msg.ReplyMarkup = kb
+					bot.Send(msg)
+				} else {
+					kb := VerticalDataInlineKeyboardMaker(nameArr, callbackArr)
+					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Выберите пункт меню")
+					msg.ReplyMarkup = kb
+					bot.Send(msg)
+				}
 			}
 			
 		}
@@ -195,29 +210,45 @@ func VerticalDataInlineKeyboardMaker(names, callbacks []string) tgbotapi.InlineK
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
+func PriceListInlineKeyboardMarkup(names, prices, callbacks []string) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
 
-
-func Navigation(callback string, node Node) ([]string, []string) {
-	if node.isEnding() {
-		return make([]string, 0), make([]string, 0)
+	for i := 0; i < len(names); i+=1 {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(names[i], "None"),
+			tgbotapi.NewInlineKeyboardButtonData("В корзину за: "+prices[i], callbacks[i])),
+		)
 	}
 
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+
+
+func Navigation(callback string, node Node) ([]string, []string, []string) {
 	if node.getCallback() == callback {
 		calls := make([]string, 0)
 		names := make([]string, 0)
+		prices := make([]string, 0)
+
 		for _, v := range node.getSubmenus() {
 			calls = append(calls, v.getCallback())
 			names = append(names, v.getName())
+			if v.isEnding() {
+				prices = append(prices, v.getPrice())
+			} 
 		}
-		return names, calls
+		return names, calls, prices
 	}
 
 	calbackArr := make([]string, 0)
 	nameArr := make([]string, 0)
+	priceArr := make([]string, 0)
 	for _, v := range node.getSubmenus() {
-		n, c := Navigation(callback, v)
+		n, c, p := Navigation(callback, v)
+		priceArr = p
 		calbackArr = append(calbackArr, c...)
 		nameArr = append(nameArr, n...)
 	}
-	return nameArr, calbackArr
+	return nameArr, calbackArr, priceArr
 }
