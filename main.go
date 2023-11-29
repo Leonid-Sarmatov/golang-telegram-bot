@@ -21,26 +21,29 @@ type Cart struct {
 }
 
 // Добавления в заказ позиции 
-func (c *Cart) AddOrderItems(price, name string) error {
-	n, err := strconv.Atoi(price)
+func (c *Cart) AddOrderItems(p Position) error {
+	n, err := strconv.Atoi(p.Price)
 	if err != nil {
-		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", name)
+		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", p.Name)
 	}
 
 	c.SumPrice += n
-	c.PositionItems[name] = 
+	if c.PositionItems == nil {
+		c.PositionItems = make(map[string]Position)
+	}
+	c.PositionItems[p.Name] = p
 	return nil
 }
 
 // Удаление позиции из заказа
-func (c *Cart) RemoveOrderItems(price, name string) error {
-	n, err := strconv.Atoi(price)
+func (c *Cart) RemoveOrderItems(p Position) error {
+	n, err := strconv.Atoi(p.Price)
 	if err != nil {
-		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", e.Name)
+		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", p.Name)
 	}
 
 	c.SumPrice -= n
-	delete(c.PositionItems, name)
+	delete(c.PositionItems, p.Name)
 	return nil
 }
 
@@ -113,15 +116,15 @@ func (e EndingMenu) getPrice() string {
 
 func main() {
 	// ***** Начало создания структуры меню *****
-    e1 := EndingMenu { Name: "Пеперони", Price: "100p", Callback: "peperoni" }
-	e2 := EndingMenu { Name: "Четыре сыра", Price: "120p", Callback: "4_chees" }
-	e3 := EndingMenu { Name: "Маргарита", Price: "90p", Callback: "margarita" }
+    e1 := EndingMenu { Name: "Пеперони", Price: "100", Callback: "peperoni" }
+	e2 := EndingMenu { Name: "Четыре сыра", Price: "120", Callback: "4_chees" }
+	e3 := EndingMenu { Name: "Маргарита", Price: "90", Callback: "margarita" }
 
-	e4 := EndingMenu { Name: "Капучино", Price: "150p", Callback: "capuchino" }
-	e5 := EndingMenu { Name: "Латте", Price: "150p", Callback: "latte" }
+	e4 := EndingMenu { Name: "Капучино", Price: "150", Callback: "capuchino" }
+	e5 := EndingMenu { Name: "Латте", Price: "150", Callback: "latte" }
 
-	e6 := EndingMenu { Name: "Сендвич с ветчиной", Price: "120p", Callback: "vetchina" }
-	e7 := EndingMenu { Name: "Сендвич с курицей", Price: "130p", Callback: "kurica" }
+	e6 := EndingMenu { Name: "Сендвич с ветчиной", Price: "120", Callback: "vetchina" }
+	e7 := EndingMenu { Name: "Сендвич с курицей", Price: "130", Callback: "kurica" }
 
 	n1 := NodeMenu { Name: "Пицца", Callback: "pizza", SubMenu: []Node{ e1, e2, e3 }}
 	n2 := NodeMenu { Name: "Напитки", Callback: "drink", SubMenu: []Node{ e4, e5 }}
@@ -129,6 +132,8 @@ func main() {
 
 	n0 := NodeMenu { Name: "Меню", Callback: "menu", SubMenu: []Node{ n1, n2, n3 }}
 	// ***** Конец создания структуры меню *****
+
+	cartMap := make(map[string]Cart)
 
 	token := "6058196438:AAH2svI0pJAcJ592nIojO1yuv43JwFwRlu4"
 
@@ -169,7 +174,14 @@ func main() {
 				}
 			// Если калбек не найден, значит это был калбек от кнопки добавления позиции в заказ
 			} else {
-
+				AddOrderButtonCallbackHandler(
+					&cartMap, 
+					strconv.FormatInt(update.CallbackQuery.Message.Chat.ID, 10), 
+					update.CallbackQuery.Data,
+					n0,
+				)
+				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Пункт добавлен в корзину")
+				bot.Send(msg)
 			}
 			
 		}
@@ -192,17 +204,26 @@ func main() {
 			}
 		}
 
-		if update.Message.Text == "See menu" {
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "This is my menu.")
+		if update.Message.Text == "Посмотреть меню" {
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите категорию продукта")
 			msg.ReplyMarkup = VerticalDataInlineKeyboardMaker(
 				[]string{ n0.Name },
 				[]string{ n0.Callback },
 			)
-			/*msg.ReplyMarkup = VerticalDataInlineKeyboardMaker(
-				[]string{"Pizza 1", "Pizza 2", "Pizza 3"},
-				[]string{"1", "2", "3"},
-			)*/
 			bot.Send(msg)
+		}
+
+		if update.Message.Text == "Моя корзина" {
+			cart, ok := cartMap[strconv.FormatInt(update.Message.Chat.ID, 10)] 
+			if ok {
+				kb := CartInlineKeyboardMarkup(cart.PositionItems)
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Список товаров в вашей корзине")
+				msg.ReplyMarkup = kb
+				bot.Send(msg)
+			} else {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Корзина пока пуста")
+				bot.Send(msg)
+			}
 		}
 	}
 }
@@ -235,7 +256,20 @@ func PriceListInlineKeyboardMarkup(names, prices, callbacks []string) tgbotapi.I
 	for i := 0; i < len(names); i+=1 {
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(names[i], "None"),
-			tgbotapi.NewInlineKeyboardButtonData("В корзину за: "+prices[i], callbacks[i])),
+			tgbotapi.NewInlineKeyboardButtonData("В корзину за: "+prices[i]+"p", callbacks[i])),
+		)
+	}
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+func CartInlineKeyboardMarkup(positionItems map[string]Position) tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	for k, v := range positionItems {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(k+" "+v.Price+"p", "None"),
+			tgbotapi.NewInlineKeyboardButtonData("Удалить из корзины", "None")),
 		)
 	}
 
@@ -243,20 +277,47 @@ func PriceListInlineKeyboardMarkup(names, prices, callbacks []string) tgbotapi.I
 }
 
 
+
+// Функция-обработчик для поиска нужной позиции заказа по калбеку, и добавления этой позиции в заказ
 func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, userId, callback string, node Node) error {
 	if node.getCallback() == callback {
+		// Создаем позицию для заказа
 		p := Position {
 			Name: node.getName(),
 			Price: node.getPrice(),
 		}
-
-
+		// Если корзина для пользователя уже создана, то обновляем ее
+		cart, ok := (*cartMap)[userId];
+		if ok {
+			cart.AddOrderItems(p)
+			(*cartMap)[userId] = cart
+		// Иначе создаем новую корзину и добавляем в нее позицию 
+		} else {
+			var newCart Cart
+			newCart.AddOrderItems(p)
+			(*cartMap)[userId] = newCart
+		}
+		return nil
 	}
+
+	// Рекурсивно ищем калбек в дочерних узлах этого узла
+	for _, v := range node.getSubmenus() {
+		AddOrderButtonCallbackHandler(cartMap, userId, callback, v)
+	}
+
+	if _, ok := (*cartMap)[userId]; ok {
+		return nil
+	}
+
+	return fmt.Errorf("ERROR: Can not add position in CartMap. ID: %s, Node: %s\n", userId, node)
 }
 
 
+
+// Функция поиска узла по калбеку
 func Navigation(callback string, node Node) ([]string, []string, []string) {
 
+	// Если нашли нужный калбек, то добавляем в списки его параметры
 	if node.getCallback() == callback {
 		calls := make([]string, 0)
 		names := make([]string, 0)
@@ -278,6 +339,8 @@ func Navigation(callback string, node Node) ([]string, []string, []string) {
 	calbackArr := make([]string, 0)
 	nameArr := make([]string, 0)
 	priceArr := make([]string, 0)
+
+	// Рекурсивно ищем калбек в дочерних узлах этого узла
 	for _, v := range node.getSubmenus() {
 		n, c, p := Navigation(callback, v)
 		priceArr = append(priceArr, p...)
