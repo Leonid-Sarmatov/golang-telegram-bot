@@ -9,33 +9,38 @@ import (
 )
 
 
+
 // Структура описывающая корзину заказа
+type Position struct {
+	Name string
+	Price string
+}
 type Cart struct {
 	SumPrice int
-	OrderItems map[string]EndingMenu
+	PositionItems map[string]Position
 }
 
 // Добавления в заказ позиции 
-func (c *Cart) AddOrderItems(e EndingMenu) error {
-	n, err := strconv.Atoi(e.Price)
+func (c *Cart) AddOrderItems(price, name string) error {
+	n, err := strconv.Atoi(price)
 	if err != nil {
-		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", e.Name)
+		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", name)
 	}
 
 	c.SumPrice += n
-	c.OrderItems[e.Name] = e
+	c.PositionItems[name] = 
 	return nil
 }
 
 // Удаление позиции из заказа
-func (c *Cart) RemoveOrderItems(e EndingMenu) error {
-	n, err := strconv.Atoi(e.Price)
+func (c *Cart) RemoveOrderItems(price, name string) error {
+	n, err := strconv.Atoi(price)
 	if err != nil {
 		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", e.Name)
 	}
 
 	c.SumPrice -= n
-	delete(c.OrderItems, e.Name)
+	delete(c.PositionItems, name)
 	return nil
 }
 
@@ -107,6 +112,7 @@ func (e EndingMenu) getPrice() string {
 }
 
 func main() {
+	// ***** Начало создания структуры меню *****
     e1 := EndingMenu { Name: "Пеперони", Price: "100p", Callback: "peperoni" }
 	e2 := EndingMenu { Name: "Четыре сыра", Price: "120p", Callback: "4_chees" }
 	e3 := EndingMenu { Name: "Маргарита", Price: "90p", Callback: "margarita" }
@@ -114,12 +120,16 @@ func main() {
 	e4 := EndingMenu { Name: "Капучино", Price: "150p", Callback: "capuchino" }
 	e5 := EndingMenu { Name: "Латте", Price: "150p", Callback: "latte" }
 
+	e6 := EndingMenu { Name: "Сендвич с ветчиной", Price: "120p", Callback: "vetchina" }
+	e7 := EndingMenu { Name: "Сендвич с курицей", Price: "130p", Callback: "kurica" }
+
 	n1 := NodeMenu { Name: "Пицца", Callback: "pizza", SubMenu: []Node{ e1, e2, e3 }}
 	n2 := NodeMenu { Name: "Напитки", Callback: "drink", SubMenu: []Node{ e4, e5 }}
+	n3 := NodeMenu { Name: "Сендвичи", Callback: "sandvuch", SubMenu: []Node{ e6, e7 }}
 
-	n0 := NodeMenu { Name: "Меню", Callback: "menu", SubMenu: []Node{ n1, n2 }}
+	n0 := NodeMenu { Name: "Меню", Callback: "menu", SubMenu: []Node{ n1, n2, n3 }}
+	// ***** Конец создания структуры меню *****
 
-	//token := os.Getenv("6058196438:AAH2svI0pJAcJ592nIojO1yuv43JwFwRlu4")
 	token := "6058196438:AAH2svI0pJAcJ592nIojO1yuv43JwFwRlu4"
 
 	bot, err := tgbotapi.NewBotAPI(token)
@@ -139,19 +149,27 @@ func main() {
 	for update := range updates {
 
 		if update.CallbackQuery != nil {
+		    // Ищем нужный калбек в дереве меню
 			nameArr, callbackArr, priceArr := Navigation(update.CallbackQuery.Data, n0)
-			if len(nameArr) != 0 { // PriceListInlineKeyboardMarkup
+			// Если он нашелся, отправляем пользователю нужный узел меню
+			if len(nameArr) != 0 { 
+				// Если список с уенами не нулевой, значит мы на конце меню, то есть на позициях для заказа
 				if len(priceArr) != 0 {
+					// Создаем клавиатуру для добавления позиции в заказ
 					kb := PriceListInlineKeyboardMarkup(nameArr, priceArr, callbackArr)
 					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Выберите товар")
 					msg.ReplyMarkup = kb
 					bot.Send(msg)
 				} else {
+					// Создаем клавиатуру для дальнейшей навигации по меню
 					kb := VerticalDataInlineKeyboardMaker(nameArr, callbackArr)
 					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Выберите пункт меню")
 					msg.ReplyMarkup = kb
 					bot.Send(msg)
 				}
+			// Если калбек не найден, значит это был калбек от кнопки добавления позиции в заказ
+			} else {
+
 			}
 			
 		}
@@ -163,10 +181,11 @@ func main() {
 		if update.Message.IsCommand() {
 			switch update.Message.Command() {
 			case "start":
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Hi, i'm pizza-maker bot. See my menu")
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Привет! Я бот для продажи пиццы, в моем меню есть много вкусного)")
 				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
 					tgbotapi.NewKeyboardButtonRow(
-						tgbotapi.NewKeyboardButton("See menu"),
+						tgbotapi.NewKeyboardButton("Посмотреть меню"),
+						tgbotapi.NewKeyboardButton("Моя корзина"),
 					),
 				)
 				bot.Send(msg)
@@ -224,8 +243,20 @@ func PriceListInlineKeyboardMarkup(names, prices, callbacks []string) tgbotapi.I
 }
 
 
+func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, userId, callback string, node Node) error {
+	if node.getCallback() == callback {
+		p := Position {
+			Name: node.getName(),
+			Price: node.getPrice(),
+		}
+
+
+	}
+}
+
 
 func Navigation(callback string, node Node) ([]string, []string, []string) {
+
 	if node.getCallback() == callback {
 		calls := make([]string, 0)
 		names := make([]string, 0)
@@ -238,6 +269,9 @@ func Navigation(callback string, node Node) ([]string, []string, []string) {
 				prices = append(prices, v.getPrice())
 			} 
 		}
+		fmt.Println("==========")
+		fmt.Println("calls: ", calls, "  names: ", names, "  prices: ", prices, " node: ", node)
+		fmt.Println("==========")
 		return names, calls, prices
 	}
 
@@ -246,7 +280,7 @@ func Navigation(callback string, node Node) ([]string, []string, []string) {
 	priceArr := make([]string, 0)
 	for _, v := range node.getSubmenus() {
 		n, c, p := Navigation(callback, v)
-		priceArr = p
+		priceArr = append(priceArr, p...)
 		calbackArr = append(calbackArr, c...)
 		nameArr = append(nameArr, n...)
 	}
