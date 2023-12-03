@@ -17,7 +17,7 @@ type Position struct {
 // Структура описывающая корзину
 type Cart struct {
 	SumPrice string
-	PositionItems map[string]Position
+	PositionItems map[string][]Position
 }
 
 // Добавления позиции в корзину
@@ -31,7 +31,13 @@ func (c *Cart) AddPositionItem(p Position) error {
 	newPrice := nowPrice+d
 	c.SumPrice = strconv.Itoa(newPrice)
 
-	c.PositionItems[p.Name] = p
+	// Если такая позиция уже есть в заказе, значит добавляем еще один такой же товар
+	if val, ok := c.PositionItems[p.Name]; ok && len(val) != 0 {
+		c.PositionItems[p.Name] = append(c.PositionItems[p.Name], p)
+	// Иначе просто добавляем позицию
+	} else {
+		c.PositionItems[p.Name] = []Position{p}
+	}
 	return nil
 }
 
@@ -45,7 +51,14 @@ func (c *Cart) RemovePositionItem(p Position) error {
 	nowPrice, _ := strconv.Atoi(c.SumPrice)
 	newPrice := nowPrice-d
 	c.SumPrice = strconv.Itoa(newPrice)
-	delete(c.PositionItems, p.Name)
+
+	// Если такие товары уже лежат в корзине, то уменьшаем их количество
+	if val, ok := c.PositionItems[p.Name]; ok && len(val) != 0 {
+		c.PositionItems[p.Name] = c.PositionItems[p.Name][1:]
+	// Иначе просто убираем позицию
+	} else {
+		delete(c.PositionItems, p.Name)
+	}
 	return nil
 }
 
@@ -174,15 +187,8 @@ func main() {
 					msg.ReplyMarkup = kb
 					bot.Send(msg)
 				}
-			// Если калбек не найден, значит это был калбек от кнопки добавления позиции в заказ
+			// Если калбек не найден, значит это был калбек либо от кнопки добавления позиции либо от кнопки удаления
 			} else {
-				/*
-				AddOrderButtonCallbackHandler(
-					&cartMap, 
-					strconv.FormatInt(update.CallbackQuery.Message.Chat.ID, 10), 
-					update.CallbackQuery.Data,
-					n0,
-				)*/
 				AddOrderButtonCallbackHandler(
 					&cartMap,  
 					update.CallbackQuery,
@@ -280,16 +286,21 @@ func CartInlineKeyboardMarkup(cart Cart) tgbotapi.InlineKeyboardMarkup {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for k, v := range positionItems {
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(k+" "+v.Price+"p", "None"),
-			tgbotapi.NewInlineKeyboardButtonData("Удалить из корзины", "None")),
-		)
+		for _, i := range v {
+			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(k+" "+i.Price+"p", "None"),
+				tgbotapi.NewInlineKeyboardButtonData("Удалить из корзины", "delete"+k)),
+			)
+		}
 	}
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-
+func DeleteOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) error {
+	id := strconv.FormatInt((*callbackQuery).Message.Chat.ID, 10)
+	callback := (*callbackQuery).Data
+}
 
 // Функция-обработчик для поиска нужной позиции заказа по калбеку, и добавления этой позиции в заказ
 func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) error {
@@ -311,7 +322,7 @@ func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbo
 		} else {
 			newCart := Cart {
 				SumPrice: "0",
-				PositionItems: make(map[string]Position),
+				PositionItems: make(map[string][]Position),
 			}
 			newCart.AddPositionItem(pos)
 			(*cartMap)[id] = newCart
