@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"strconv"
+	"strings"
 	"fmt"
 	//"os"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -12,6 +13,7 @@ import (
 type Position struct {
 	Name string
 	Price string
+	Callback string
 }
 
 // Структура описывающая корзину
@@ -289,7 +291,7 @@ func CartInlineKeyboardMarkup(cart Cart) tgbotapi.InlineKeyboardMarkup {
 		for _, i := range v {
 			rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(k+" "+i.Price+"p", "None"),
-				tgbotapi.NewInlineKeyboardButtonData("Удалить из корзины", "delete"+k)),
+				tgbotapi.NewInlineKeyboardButtonData("Удалить из корзины", "delete"+i.Callback)),
 			)
 		}
 	}
@@ -297,24 +299,24 @@ func CartInlineKeyboardMarkup(cart Cart) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-func DeleteOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) error {
-	id := strconv.FormatInt((*callbackQuery).Message.Chat.ID, 10)
-	callback := (*callbackQuery).Data
-}
+
 
 // Функция-обработчик для поиска нужной позиции заказа по калбеку, и добавления этой позиции в заказ
-func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) error {
+func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) bool {
 	id := strconv.FormatInt((*callbackQuery).Message.Chat.ID, 10)
 	callback := (*callbackQuery).Data
+	res := false
 
+	// Проверяем лобавление в заказ 
 	if node.getCallback() == callback {
-		// Создаем позицию для заказа   CallbackQuery
+		// Создаем позицию для заказа 
 		pos := Position {
 			Name: node.getName(),
 			Price: node.getPrice(),
+			Callback: node.getCallback(),
 		}
-		// Если корзина для пользователя уже создана, то обновляем ее   userId, callback string
 		cart, ok := (*cartMap)[id];
+		// Если корзина для пользователя уже создана, то обновляем ее
 		if ok {
 			cart.AddPositionItem(pos)
 			(*cartMap)[id] = cart
@@ -327,19 +329,35 @@ func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbo
 			newCart.AddPositionItem(pos)
 			(*cartMap)[id] = newCart
 		}
-		return nil
+		return false
+	}
+
+	// Проверяем удаление из заказа
+	if strings.HasPrefix(callback, "delete") && strings.HasSuffix(callback, node.getCallback()) {
+		fmt.Println("========================")
+		fmt.Println("delete")
+		fmt.Println("========================")
+		// Создаем позицию для удаления 
+		pos := Position {
+			Name: node.getName(),
+			Price: node.getPrice(),
+		}
+		cart, ok := (*cartMap)[id];
+		// Удаляем позицию из корзины
+		if ok {
+			cart.RemovePositionItem(pos)
+			(*cartMap)[id] = cart
+			return true
+		} 
+		return false
 	}
 
 	// Рекурсивно ищем калбек в дочерних узлах этого узла
 	for _, v := range node.getSubmenus() {
-		AddOrderButtonCallbackHandler(cartMap, callbackQuery, v)
+		res = res || AddOrderButtonCallbackHandler(cartMap, callbackQuery, v)
 	}
 
-	if _, ok := (*cartMap)[id]; ok {
-		return nil
-	}
-
-	return fmt.Errorf("ERROR: Can not add position in CartMap. ID: %s, Node: %s\n", id, node)
+	return res
 }
 
 
