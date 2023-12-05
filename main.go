@@ -9,61 +9,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// Структура описывающая позицию заказа
-type Position struct {
-	Name string
-	Price string
-	Callback string
-}
-
-// Структура описывающая корзину
-type Cart struct {
-	SumPrice string
-	PositionItems map[string][]Position
-}
-
-// Добавления позиции в корзину
-func (c *Cart) AddPositionItem(p Position) error {
-	d, err := strconv.Atoi(p.Price)
-	if err != nil {
-		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", p.Name)
-	}
-
-	nowPrice, _ := strconv.Atoi(c.SumPrice)
-	newPrice := nowPrice+d
-	c.SumPrice = strconv.Itoa(newPrice)
-
-	// Если такая позиция уже есть в заказе, значит добавляем еще один такой же товар
-	if val, ok := c.PositionItems[p.Name]; ok && len(val) != 0 {
-		c.PositionItems[p.Name] = append(c.PositionItems[p.Name], p)
-	// Иначе просто добавляем позицию
-	} else {
-		c.PositionItems[p.Name] = []Position{p}
-	}
-	return nil
-}
-
-// Удаление позиции из корзины
-func (c *Cart) RemovePositionItem(p Position) error {
-	d, err := strconv.Atoi(p.Price)
-	if err != nil {
-		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", p.Name)
-	}
-
-	nowPrice, _ := strconv.Atoi(c.SumPrice)
-	newPrice := nowPrice-d
-	c.SumPrice = strconv.Itoa(newPrice)
-
-	// Если такие товары уже лежат в корзине, то уменьшаем их количество
-	if val, ok := c.PositionItems[p.Name]; ok && len(val) != 0 {
-		c.PositionItems[p.Name] = c.PositionItems[p.Name][1:]
-	// Иначе просто убираем позицию
-	} else {
-		delete(c.PositionItems, p.Name)
-	}
-	return nil
-}
-
 // Интерфейс, описывающий обстрактный узел дерева меню
 type Node interface {
 	isEnding() bool
@@ -131,6 +76,58 @@ func (e EndingMenu) getPrice() string {
 	return e.Price
 }
 
+
+
+// Структура описывающая корзину
+type Cart struct {
+	SumPrice string
+	PositionItems map[string][]EndingMenu
+}
+
+// Добавления позиции в корзину
+func (c *Cart) AddPositionItem(e EndingMenu) error {
+	d, err := strconv.Atoi(e.Price)
+	if err != nil {
+		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", e.Name)
+	}
+
+	nowPrice, _ := strconv.Atoi(c.SumPrice)
+	newPrice := nowPrice+d
+	c.SumPrice = strconv.Itoa(newPrice)
+
+	// Если такая позиция уже есть в заказе, значит добавляем еще один такой же товар
+	if val, ok := c.PositionItems[e.Name]; ok && len(val) != 0 {
+		c.PositionItems[e.Name] = append(c.PositionItems[e.Name], e)
+	// Иначе просто добавляем позицию
+	} else {
+		c.PositionItems[e.Name] = []EndingMenu{e}
+	}
+	return nil
+}
+
+// Удаление позиции из корзины
+func (c *Cart) RemovePositionItem(e EndingMenu) error {
+	d, err := strconv.Atoi(e.Price)
+	if err != nil {
+		return fmt.Errorf("ERROR: Price value is not integer. Order: %s\n", e.Name)
+	}
+
+	nowPrice, _ := strconv.Atoi(c.SumPrice)
+	newPrice := nowPrice-d
+	c.SumPrice = strconv.Itoa(newPrice)
+
+	// Если такие товары уже лежат в корзине, то уменьшаем их количество
+	if val, ok := c.PositionItems[e.Name]; ok && len(val) != 0 {
+		c.PositionItems[e.Name] = c.PositionItems[e.Name][1:]
+	// Иначе просто убираем позицию
+	} else {
+		delete(c.PositionItems, e.Name)
+	}
+	return nil
+}
+
+
+
 func main() {
 	// ***** Начало создания структуры меню *****
     e1 := EndingMenu { Name: "Пеперони", Price: "100", Callback: "peperoni" }
@@ -171,11 +168,11 @@ func main() {
 	for update := range updates {
 
 		if update.CallbackQuery != nil {
-		    // Ищем нужный калбек в дереве меню
+		    // Ищем нужный калбек в узлах дерева меню
 			nameArr, callbackArr, priceArr := Navigation(update.CallbackQuery.Data, n0)
 			// Если он нашелся, отправляем пользователю нужный узел меню
 			if len(nameArr) != 0 { 
-				// Если список с уенами не нулевой, значит мы на конце меню, то есть на позициях для заказа
+				// Если список с ценами не нулевой, значит мы на узле, к которому прикреплены конечные узлы меню (позиции для заказа)
 				if len(priceArr) != 0 {
 					// Создаем клавиатуру для добавления позиции в заказ
 					kb := PriceListInlineKeyboardMarkup(nameArr, priceArr, callbackArr)
@@ -189,15 +186,27 @@ func main() {
 					msg.ReplyMarkup = kb
 					bot.Send(msg)
 				}
-			// Если калбек не найден, значит это был калбек либо от кнопки добавления позиции либо от кнопки удаления
-			} else {
-				AddOrderButtonCallbackHandler(
-					&cartMap,  
-					update.CallbackQuery,
-					n0,
-				)
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Пункт добавлен в корзину")
-				bot.Send(msg)
+				continue
+			}
+
+			// Если калбек не найден в узлах, значит это был калбек либо от кнопки добавления/удаления позиции
+			isRemoving, isCallbackFound := AddOrRemovButtonCallbackHandler(
+				&cartMap,  
+				update.CallbackQuery,
+				n0,
+			)
+			if isCallbackFound {
+				// Если калбек был удален, пишем сообщение об удалени позиции из корзины
+				if isRemoving {
+					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Позиция удалена из корзины")
+					bot.Send(msg)
+				} 
+				// Если калбек не был удален, пишем сообщение о добавлении позиции в корзину
+				if !isRemoving {
+					msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Позиция добавлена в корзину")
+					bot.Send(msg)
+				}
+				continue
 			}
 			
 		}
@@ -231,7 +240,7 @@ func main() {
 
 		if update.Message.Text == "Моя корзина" {
 			cart, ok := cartMap[strconv.FormatInt(update.Message.Chat.ID, 10)] 
-			if ok {
+			if ok && len(cart.PositionItems) != 0 {
 				kb := CartInlineKeyboardMarkup(cart)
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Список товаров в вашей корзине\nСуммарная стоимость: "+cart.SumPrice)
 				msg.ReplyMarkup = kb
@@ -301,16 +310,21 @@ func CartInlineKeyboardMarkup(cart Cart) tgbotapi.InlineKeyboardMarkup {
 
 
 
-// Функция-обработчик для поиска нужной позиции заказа по калбеку, и добавления этой позиции в заказ
-func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) bool {
+// Функция-обработчик для поиска нужной позиции заказа по калбеку, и добавления/удаления этой позиции
+func AddOrRemovButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) (bool, bool) {
+	// ID пользователя
 	id := strconv.FormatInt((*callbackQuery).Message.Chat.ID, 10)
+	// Строка каллбека
 	callback := (*callbackQuery).Data
-	res := false
+	// Флаг успешного удаления элемента
+	isRemoving := false
+	// Флаг успешного нахождения калбека
+	isCallbackFound := false
 
-	// Проверяем лобавление в заказ 
+	// Если найден нужный калбек, то добавляем позицию в карзину 
 	if node.getCallback() == callback {
 		// Создаем позицию для заказа 
-		pos := Position {
+		pos := EndingMenu {
 			Name: node.getName(),
 			Price: node.getPrice(),
 			Callback: node.getCallback(),
@@ -324,40 +338,40 @@ func AddOrderButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbo
 		} else {
 			newCart := Cart {
 				SumPrice: "0",
-				PositionItems: make(map[string][]Position),
+				PositionItems: make(map[string][]EndingMenu),
 			}
 			newCart.AddPositionItem(pos)
 			(*cartMap)[id] = newCart
 		}
-		return false
+		return false, true
 	}
 
-	// Проверяем удаление из заказа
+	// Если у калбека есть префикс "delete" - значит нужно не добавить, а удалить позицию
 	if strings.HasPrefix(callback, "delete") && strings.HasSuffix(callback, node.getCallback()) {
-		fmt.Println("========================")
-		fmt.Println("delete")
-		fmt.Println("========================")
 		// Создаем позицию для удаления 
-		pos := Position {
+		pos := EndingMenu {
 			Name: node.getName(),
 			Price: node.getPrice(),
+			Callback: node.getCallback(),
 		}
 		cart, ok := (*cartMap)[id];
 		// Удаляем позицию из корзины
 		if ok {
 			cart.RemovePositionItem(pos)
 			(*cartMap)[id] = cart
-			return true
+			return true, true
 		} 
-		return false
+		return false, true
 	}
 
 	// Рекурсивно ищем калбек в дочерних узлах этого узла
 	for _, v := range node.getSubmenus() {
-		res = res || AddOrderButtonCallbackHandler(cartMap, callbackQuery, v)
+		isr, isf := AddOrRemovButtonCallbackHandler(cartMap, callbackQuery, v)
+		isRemoving = isRemoving || isr
+		isCallbackFound = isCallbackFound || isf
 	}
 
-	return res
+	return isRemoving, isCallbackFound
 }
 
 
