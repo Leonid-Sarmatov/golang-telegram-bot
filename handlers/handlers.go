@@ -36,7 +36,7 @@ func AllTextHandler(
 	return msg
 }
 
-func AllCommandsHandler(message tgbotapi.Message) tgbotapi.MessageConfig {
+func AllCommandsHandler(message *tgbotapi.Message) tgbotapi.MessageConfig {
 	// Переменная сообщения для отправки 
 	var msg tgbotapi.MessageConfig
 

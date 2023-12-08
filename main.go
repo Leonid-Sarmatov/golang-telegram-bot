@@ -57,17 +57,7 @@ func main() {
 		}
 
 		if update.Message.IsCommand() {
-			switch update.Message.Command() {
-			case "start":
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Привет! Я бот для продажи пиццы, в моем меню есть много вкусного)")
-				msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
-					tgbotapi.NewKeyboardButtonRow(
-						tgbotapi.NewKeyboardButton("Посмотреть меню"),
-						tgbotapi.NewKeyboardButton("Моя корзина"),
-					),
-				)
-				bot.Send(msg)
-			}
+			bot.Send(AllCommandsHandler(update.Message))
 		}
 
 		if update.Message.Text != "" {
