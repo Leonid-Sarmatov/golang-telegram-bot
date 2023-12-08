@@ -8,8 +8,14 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+var (
+	token = "6058196438:AAH2svI0pJAcJ592nIojO1yuv43JwFwRlu4"
+	cartMap = make(map[string]Cart)
+)
+
 
 func main() {
+
 	// ***** Начало создания структуры меню *****
     e1 := EndingMenu { Name: "Пеперони", Price: "100", Callback: "peperoni" }
 	e2 := EndingMenu { Name: "Четыре сыра", Price: "120", Callback: "4_chees" }
@@ -28,10 +34,7 @@ func main() {
 	n0 := NodeMenu { Name: "Меню", Callback: "menu", SubMenu: []Node{ n1, n2, n3 }}
 	// ***** Конец создания структуры меню *****
 
-	cartMap := make(map[string]Cart)
-
-	token := "6058196438:AAH2svI0pJAcJ592nIojO1yuv43JwFwRlu4"
-
+	
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Fatal(err)
