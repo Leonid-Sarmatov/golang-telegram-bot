@@ -121,7 +121,7 @@ func (c *Cart) RemovePositionItem(e EndingMenu) error {
 		c.SumPrice = strconv.Itoa(newPrice)
 	// Иначе просто убираем позицию
 	} else {
-		return fmt.Errorf("ERROR: Can not remove position, cart is empty. Order: %s\n", e.Name)
+		return fmt.Errorf("ERROR: Can not remove position, cart is empty.")
 	}
 	return nil
 }

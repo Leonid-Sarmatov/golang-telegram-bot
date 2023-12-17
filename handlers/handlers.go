@@ -82,6 +82,31 @@ func AllCallbackHandler(
 		return msg
 	}
 
+	err := AddInCartButtonCallbackHandler(
+		cartMap,  
+		callbackQuery,
+		nodeTree,
+	)
+
+	if err == nil {
+		msg = tgbotapi.NewMessage((*callbackQuery).Message.Chat.ID, "Позиция добавлена в корзину")
+		return msg
+	}
+
+	err = RemovOutCartButtonCallbackHandler(
+		cartMap,  
+		callbackQuery,
+		nodeTree,
+	)
+
+	if err == nil {
+		msg = tgbotapi.NewMessage((*callbackQuery).Message.Chat.ID, "Позиция удалена из корзины")
+		return msg
+	}
+
+	msg = tgbotapi.NewMessage((*callbackQuery).Message.Chat.ID, err.Error())
+	return msg
+	/*
 	// Если калбек не найден в узлах, значит это мог быть калбек от кнопки добавления/удаления позиции
 	isRemoving, isCallbackFound := AddOrRemovButtonCallbackHandler(
 		cartMap,  
@@ -100,5 +125,5 @@ func AllCallbackHandler(
 		}
 		return msg
 	}
-	return msg
+	return msg*/
 }

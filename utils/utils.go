@@ -64,10 +64,12 @@ func RemovOutCartButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *
 	id := strconv.FormatInt((*callbackQuery).Message.Chat.ID, 10)
 	// Строка каллбека
 	callback := (*callbackQuery).Data
-	// Флаг успешного удаления элемента
-	isRemoving := false
-	// Флаг успешного нахождения калбека
-	isCallbackFound := false
+	// Флаг ошибки удаления элемента
+	removingErr := false
+	// Флаг ошибки нахождения калбека
+	//callbackFoundErr := true
+	// Флаг ошибки нахождения корзины
+	//cartFoundErr := false
 
 	// Если у калбека есть префикс "delete" - значит нужно не добавить, а удалить позицию
 	if strings.HasPrefix(callback, "delete") && strings.HasSuffix(callback, node.GetCallback()) {
@@ -80,23 +82,37 @@ func RemovOutCartButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *
 		cart, ok := (*cartMap)[id];
 		// Удаляем позицию из корзины
 		if ok {
-			cart.RemovePositionItem(pos)
+			err := cart.RemovePositionItem(pos)
+			if err != nil {
+				removingErr = true
+				return fmt.Errorf("Can not remove position")
+			}
 			(*cartMap)[id] = cart
+			//callbackFoundErr = false
 			return nil
 		}
-		 
+
+		//cartFoundErr = true
 		return fmt.Errorf("Cart not found for id")
 	}
 
 	// Рекурсивно ищем калбек в дочерних узлах этого узла
 	for _, v := range node.GetSubmenus() {
 		err := RemovOutCartButtonCallbackHandler(cartMap, callbackQuery, v)
-		if err != nil {
+		/*
+		if err.Error() == "Cart not found for id" {
+			cartFoundErr = cartFoundErr || true
+		}*/
 
+		if err != nil {
+			removingErr = removingErr || true
 		}
 	}
 
-	return fmt.Errorf
+	if removingErr {
+		return fmt.Errorf("error")
+	}
+	return nil
 }
 
 
