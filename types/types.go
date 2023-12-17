@@ -110,7 +110,7 @@ func (c *Cart) RemovePositionItem(e EndingMenu) error {
 
 	// Если такие товары уже лежат в корзине, то уменьшаем их количество
 	if val, ok := c.PositionItems[e.Name]; ok {
-		if len(val) != 0 {
+		if len(val) > 1 {
 			c.PositionItems[e.Name] = c.PositionItems[e.Name][1:]
 		} else {
 			delete(c.PositionItems, e.Name)
@@ -118,6 +118,9 @@ func (c *Cart) RemovePositionItem(e EndingMenu) error {
 		// Уменьшаем счетчик цены
 		nowPrice, _ := strconv.Atoi(c.SumPrice)
 		newPrice := nowPrice-d
+		if newPrice < 0 {
+			return fmt.Errorf("ERROR: Can not remove position, cart is empty.")
+		}
 		c.SumPrice = strconv.Itoa(newPrice)
 	// Иначе просто убираем позицию
 	} else {

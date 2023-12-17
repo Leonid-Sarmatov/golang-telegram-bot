@@ -25,7 +25,7 @@ func AllTextHandler(
 
 	case "Моя корзина":
 		cart, ok := (*cartMap)[strconv.FormatInt((*message).Chat.ID, 10)] 
-		if ok && len(cart.PositionItems) != 0 {
+		if ok && len(cart.PositionItems) > 0 {
 			kb := CartInlineKeyboardMarkup(cart)
 			msg = tgbotapi.NewMessage((*message).Chat.ID, "Список товаров в вашей корзине\nСуммарная стоимость: "+cart.SumPrice)
 			msg.ReplyMarkup = kb
