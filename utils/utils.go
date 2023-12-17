@@ -3,19 +3,18 @@ package utils
 import (
 	"strings"
 	"strconv"
+	"fmt"
 	. "golang_telegram_bot/types"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// Функция-обработчик для поиска нужной позиции заказа по калбеку, и добавления/удаления этой позиции
-func AddOrRemovButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) (bool, bool) {
+// Функция-обработчик для поиска нужной позиции заказа по калбеку, и добавления этой позиции
+func AddInCartButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) error {
 	// ID пользователя
 	id := strconv.FormatInt((*callbackQuery).Message.Chat.ID, 10)
 	// Строка каллбека
 	callback := (*callbackQuery).Data
-	// Флаг успешного удаления элемента
-	isRemoving := false
-	// Флаг успешного нахождения калбека
+	// Флаг ошибки, поднимается когда найден каллбек. если False, значит калбек найден не был
 	isCallbackFound := false
 
 	// Если найден нужный калбек, то добавляем позицию в карзину 
@@ -40,8 +39,35 @@ func AddOrRemovButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tg
 			newCart.AddPositionItem(pos)
 			(*cartMap)[id] = newCart
 		}
-		return false, true
+		return nil
 	}
+
+	// Рекурсивно ищем калбек в дочерних узлах этого узла
+	for _, v := range node.GetSubmenus() {
+		err := AddInCartButtonCallbackHandler(cartMap, callbackQuery, v)
+		if err == nil {
+			isCallbackFound = isCallbackFound || true
+		}
+	}
+
+	// Возвращаем ошибку, если калбек не найден
+	if isCallbackFound == false {
+		return fmt.Errorf("Callback not found")
+	} else {
+		return nil
+	}
+}
+
+// Функция-обработчик для поиска нужной позиции заказа по калбеку, и удаления этой позиции
+func RemovOutCartButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tgbotapi.CallbackQuery, node Node) error {
+	// ID пользователя
+	id := strconv.FormatInt((*callbackQuery).Message.Chat.ID, 10)
+	// Строка каллбека
+	callback := (*callbackQuery).Data
+	// Флаг успешного удаления элемента
+	isRemoving := false
+	// Флаг успешного нахождения калбека
+	isCallbackFound := false
 
 	// Если у калбека есть префикс "delete" - значит нужно не добавить, а удалить позицию
 	if strings.HasPrefix(callback, "delete") && strings.HasSuffix(callback, node.GetCallback()) {
@@ -56,19 +82,21 @@ func AddOrRemovButtonCallbackHandler(cartMap *map[string]Cart, callbackQuery *tg
 		if ok {
 			cart.RemovePositionItem(pos)
 			(*cartMap)[id] = cart
-			return true, true
-		} 
-		return false, true
+			return nil
+		}
+		 
+		return fmt.Errorf("Cart not found for id")
 	}
 
 	// Рекурсивно ищем калбек в дочерних узлах этого узла
 	for _, v := range node.GetSubmenus() {
-		isr, isf := AddOrRemovButtonCallbackHandler(cartMap, callbackQuery, v)
-		isRemoving = isRemoving || isr
-		isCallbackFound = isCallbackFound || isf
+		err := RemovOutCartButtonCallbackHandler(cartMap, callbackQuery, v)
+		if err != nil {
+
+		}
 	}
 
-	return isRemoving, isCallbackFound
+	return fmt.Errorf
 }
 
 
